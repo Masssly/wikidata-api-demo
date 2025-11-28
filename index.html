@@ -1,54 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Masssly Wikibase Test</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
-    <style>
-        body { padding: 20px; background-color: #f0f4f8; }
-        h1, p { text-align: center; }
-        
-        /* Card Styling */
-        #results-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 30px;
-        }
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
-            border-left: 5px solid #009688; /* Accent color for this project */
-        }
-        .card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
-        .item-title { font-size: 1.4rem; font-weight: bold; margin-bottom: 5px; color: #2c3e50; }
-        .details { font-size: 0.9rem; color: #555; }
-        .error-message { 
-            grid-column: 1 / -1; 
-            background: #ffebeb; 
-            padding: 20px; 
-            border: 1px solid #ff0000; 
-            border-radius: 8px; 
-            color: #ff0000;
-        }
-        .loading { grid-column: 1 / -1; text-align: center; font-size: 1.5rem; color: #666; }
-    </style>
-</head>
-<body>
-
-    <main class="container">
-        <h1>🧪 Masssly Wikibase Connection Test</h1>
-        <p>This query attempts to find the first 5 entities, regardless of type, to verify the connection.</p>
-        
-        <div id="results-container">
-            <div class="loading">📡 Connecting via CORS Proxy...</div>
-        </div>
-    </main>
-
+// ----------------------------------------------------------------
+// WARNING: Replace the ENTIRE SCRIPT block below with this one
+// ----------------------------------------------------------------
     <script>
         // === CONFIGURATION START ===
         
@@ -56,15 +8,12 @@
         const massslyEndpoint = 'https://query.masssly.wikibase.cloud/sparql';
         const endpointUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(massslyEndpoint)}`;
 
-        // 2. SOLUTION A TEST QUERY: Find the first 5 entities regardless of type.
+        // 2. ULTRA-SIMPLE TEST QUERY: Find the first 5 Items and their IDs (No Labels)
+        // This is the simplest possible query to confirm the connection is fully working.
         const myQuery = `
-            SELECT ?item ?itemLabel
+            SELECT ?item
             WHERE {
-              # Find ANY entity (Item or Lexeme)
-              ?item ?p ?o . 
-              
-              # Use the label service (as it worked in your example)
-              SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+              ?item a wikibase:Item .
             }
             LIMIT 5
         `;
@@ -79,58 +28,49 @@
                 const response = await fetch(fullUrl);
                 const data = await response.json();
 
-                // 🛑 NEW ROBUST CHECK FOR DATA STRUCTURE 🛑
+                // 🛑 ROBUST CHECK FOR DATA STRUCTURE 🛑
                 if (!data || !data.results || !data.results.bindings) {
-                    // This block catches the 'data.results is undefined' error
                     container.innerHTML = `<div class="error-message">
-                        <h4>❌ SPARQL Query or Server Error</h4>
-                        <p>The connection succeeded, but the Masssly server returned a malformed or empty results object (it's missing the expected 'bindings' list).</p>
-                        <p>This likely means the **query failed on the server side**.</p>
+                        <h4>❌ SPARQL Query Failed Server-Side</h4>
+                        <p>The query syntax likely contains an element (like prefixes or a service call) that the Masssly server rejects, causing it to return an invalid result structure.</p>
                         <p>Data Snippet Received: <code>${JSON.stringify(data).substring(0, 300)}...</code></p>
-                        <p>Try using the <a href="https://query.masssly.wikibase.cloud/" target="_blank">Masssly Query Service</a> directly to check if your query runs without errors.</p>
                     </div>`;
-                    console.error("Wikibase Query Structure Error:", data);
                     return;
                 }
                 
                 const items = data.results.bindings;
                 
-                // Clear loading
                 container.innerHTML = ''; 
 
                 if(items.length === 0) {
-                    container.innerHTML = '<p>✅ Connection OK, but query returned 0 results. The Wikibase may be empty.</p>';
+                    container.innerHTML = '<p>✅ Connection OK, but query returned 0 results. The Wikibase may have no Items.</p>';
                     return;
                 }
                 
-                // Display Results
+                // Display Results (Adapted to only show Item ID, as we removed the label service)
                 items.forEach(result => {
-                    const label = result.itemLabel ? result.itemLabel.value : 'No Label Found';
-                    const link = result.item ? result.item.value : '#';
+                    // Item URL is guaranteed to exist by the query
+                    const link = result.item.value; 
                     const entityId = link.split('/').pop();
 
                     const cardHtml = `
                         <article class="card">
-                            <div class="item-title">${label}</div>
+                            <div class="item-title">SUCCESS: Entity Found</div>
+                            <div class="details">Raw URL: <strong>${link}</strong></div>
                             <div class="details">Entity ID: <strong>${entityId}</strong></div>
-                            <a href="${link}" target="_blank" role="button" class="secondary" style="margin-top: 15px;">View on Masssly</a>
+                            <a href="${link}" target="_blank" role="button" class="secondary" style="margin-top: 15px;">View Item ${entityId}</a>
                         </article>
                     `;
                     container.innerHTML += cardHtml;
                 });
 
             } catch (error) {
-                // This block catches the original NetworkError (CORS failure) or a general fetch issue.
                 container.innerHTML = `<div class="error-message">
-                    <h4>🚨 General Fetch Error</h4>
-                    <p>Error fetching data (Check proxy/network): <strong>${error.message}</strong></p>
-                    <p>If this is the CORS error, ensure the proxy URL is correct.</p>
+                    <h4>🚨 General Fetch Error (Proxy/Network)</h4>
+                    <p>Error fetching data: <strong>${error.message}</strong></p>
                 </div>`;
-                console.error(error);
             }
         }
 
         fetchData();
     </script>
-</body>
-</html>
