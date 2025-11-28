@@ -3,123 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wikidata Lexemes Explorer</title>
+    <title>Masssly Wikibase Cloud - Human Data</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
     <style>
         body { padding: 20px; background-color: #f0f4f8; }
         h1, p { text-align: center; }
         
-        /* Grid Layout for Cards */
+        /* Card Styling */
         #results-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 20px;
             margin-top: 30px;
         }
-
-        /* Card Styling */
         .card {
             background: #fff;
             border-radius: 12px;
-            padding: 0;
+            padding: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
             transition: transform 0.2s;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid #e1e6ea;
+            border-left: 5px solid #009688; /* Accent color for this project */
         }
-        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
-        
-        /* Image area */
-        .card-image {
-            height: 180px;
-            width: 100%;
-            background-color: #eee;
-            object-fit: cover;
-        }
-        .no-image {
-            height: 180px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f0f0f0;
-            color: #888;
-            font-size: 0.9rem;
-        }
-
-        /* Content area */
-        .card-content { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; }
-        .word-title { font-size: 1.6rem; font-weight: bold; margin-bottom: 5px; color: #2c3e50; }
-        .pos-tag { 
-            display: inline-block; 
-            background: #eef2ff; 
-            color: #4361ee; 
-            padding: 2px 8px; 
-            border-radius: 4px; 
-            font-size: 0.75rem; 
-            font-weight: bold;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-        }
-        .definition { font-size: 0.9rem; color: #555; margin-bottom: 15px; flex-grow: 1; }
-        
-        /* Button */
-        .btn-link {
-            text-decoration: none;
-            background-color: #4361ee;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            text-align: center;
-            font-size: 0.9rem;
-            display: block;
-            margin-top: auto;
-        }
-        .btn-link:hover { background-color: #3046c0; text-decoration: none; color: white; }
-
+        .card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
+        .item-title { font-size: 1.4rem; font-weight: bold; margin-bottom: 5px; color: #2c3e50; }
+        .details { font-size: 0.9rem; color: #555; }
         .loading { grid-column: 1 / -1; text-align: center; font-size: 1.5rem; color: #666; }
     </style>
 </head>
 <body>
 
     <main class="container">
-        <h1>📖 Wikidata Lexeme Dictionary</h1>
-        <p>Exploring English Nouns (with images linked via senses)</p>
+        <h1>👨‍👩‍👧‍👦 Masssly Wikibase Cloud - All Humans</h1>
+        <p>This pulls all items marked as **instance of: Human (Q4)** from your genealogy Wikibase.</p>
         
         <div id="results-container">
-            <div class="loading">🔍 Scanning Wikidata for words...</div>
+            <div class="loading">📡 Connecting to Masssly Wikibase Cloud...</div>
         </div>
     </main>
 
     <script>
-        // --- CONFIGURATION: LEXEME QUERY ---
-        // asking for: English (Q1860) Lexemes
-        // That are Nouns (Q1084)
-        // That have a Sense which links to a Concept (P5137)
-        // And that Concept has an Image (P18)
+        // === CONFIGURATION START ===
+        
+        // 1. **CRITICAL CHANGE:** The custom SPARQL endpoint URL
+        const endpointUrl = 'https://query.masssly.wikibase.cloud/sparql'; 
+
+        // 2. The custom SPARQL query (Uses your exact prefixes and logic)
         const myQuery = `
-            SELECT ?lexeme ?lemma ?categoryLabel ?senseDefinition ?image WHERE {
-              ?lexeme dct:language wd:Q1860;          # Language: English
-                      wikibase:lexicalCategory wd:Q1084; # Category: Noun
-                      wikibase:lemma ?lemma;          # The actual word
-                      ontolex:sense ?sense.           # Get the sense (meaning)
-              
-              ?sense skos:definition ?senseDefinition. # Get the definition text
-              FILTER(LANG(?senseDefinition) = "en")    # Only English definitions
+            PREFIX mwd: <https://masssly.wikibase.cloud/entity/>
+            PREFIX mwdt: <https://masssly.wikibase.cloud/prop/direct/>
 
-              # The Magic Link: Sense -> Concept -> Image
-              ?sense wdt:P5137 ?concept. 
-              ?concept wdt:P18 ?image.
-
-              SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+            SELECT ?item ?itemLabel
+            WHERE {
+                # Find all items where "instance of (P3)" = Human (Q4).
+                ?item mwdt:P3 mwd:Q4 .
+                
+                # Bring in human-readable labels (names) in English.
+                SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
             }
-            LIMIT 24
+            ORDER BY ?itemLabel
+            LIMIT 20
         `;
+        
+        // === CONFIGURATION END ===
 
         async function fetchData() {
             const container = document.getElementById('results-container');
-            const endpointUrl = 'https://query.wikidata.org/sparql';
             const fullUrl = endpointUrl + '?query=' + encodeURIComponent(myQuery) + '&format=json';
 
             try {
@@ -130,31 +78,22 @@
                 container.innerHTML = ''; // Clear loading
 
                 if(items.length === 0) {
-                    container.innerHTML = '<p>No results found. Try changing the query!</p>';
+                    container.innerHTML = '<p>No results found. The Wikibase might be empty or the query needs adjustment.</p>';
                     return;
                 }
 
                 items.forEach(result => {
-                    const word = result.lemma ? result.lemma.value : 'Unknown';
-                    const def = result.senseDefinition ? result.senseDefinition.value : 'No definition';
-                    const link = result.lexeme ? result.lexeme.value : '#';
-                    const imageUrl = result.image ? result.image.value : null;
-
-                    // Clean up the URL to get just the ID (e.g., L123) for display
-                    const lexemeId = link.split('/').pop();
+                    const label = result.itemLabel ? result.itemLabel.value : 'No Label Found';
+                    const link = result.item ? result.item.value : '#';
+                    
+                    // Extract the Q/L ID from the URL (e.g., Q123)
+                    const entityId = link.split('/').pop();
 
                     const cardHtml = `
                         <article class="card">
-                            ${imageUrl 
-                                ? `<img src="${imageUrl}" class="card-image" alt="${word}">` 
-                                : `<div class="no-image">No Image Available</div>`
-                            }
-                            <div class="card-content">
-                                <span class="pos-tag">Noun</span>
-                                <div class="word-title">${word}</div>
-                                <div class="definition">${def}</div>
-                                <a href="${link}" target="_blank" class="btn-link">View ${lexemeId}</a>
-                            </div>
+                            <div class="item-title">${label}</div>
+                            <div class="details">Entity ID: <strong>${entityId}</strong></div>
+                            <a href="${link}" target="_blank" role="button" class="secondary" style="margin-top: 15px;">View on Masssly</a>
                         </article>
                     `;
                     container.innerHTML += cardHtml;
@@ -162,7 +101,7 @@
 
             } catch (error) {
                 console.error(error);
-                container.innerHTML = `<p style="color:red">Error: ${error.message}</p>`;
+                container.innerHTML = `<p style="color:red; grid-column: 1 / -1;">Error fetching data. Check your connection or query: ${error.message}</p>`;
             }
         }
 
