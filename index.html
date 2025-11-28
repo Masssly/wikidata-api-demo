@@ -3,54 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wikidata API Demo</title>
+    <title>My Wikidata Project</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        /* Simple Custom Styling */
+        body { padding: 20px; }
+        .card { margin-bottom: 20px; padding: 20px; border-radius: 8px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .loading { text-align: center; font-size: 1.5rem; color: #555; }
+        img { max-height: 200px; object-fit: cover; border-radius: 4px; }
+    </style>
 </head>
 <body>
-    <h1>Wikidata API Demo</h1>
-    <div id="wikidata-info"></div>
+
+    <main class="container">
+        <h1 style="text-align: center;">Research Data from Wikidata</h1>
+        <p style="text-align: center;">Live data pulled directly from the source.</p>
+        <hr>
+        
+        <div id="results-container">
+            <div class="loading">⏳ Loading data from Wikidata...</div>
+        </div>
+    </main>
 
     <script>
-        // Function to fetch data from Wikidata API with CORS proxy
-        async function fetchWikidataItem(itemId) {
+        // --- CONFIGURATION: CHANGE YOUR QUERY HERE ---
+        // This is a SPARQL query. It asks Wikidata for data.
+        // Currently asking for: Hospitals (Q16917) in Ghana (Q117)
+        const myQuery = `
+            SELECT ?item ?itemLabel ?image ?coords WHERE {
+              ?item wdt:P31 wd:Q16917;    # Instance of Hospital
+                    wdt:P17 wd:Q117.      # Country: Ghana
+              OPTIONAL { ?item wdt:P18 ?image. }  # Get image if available
+              SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+            }
+            LIMIT 20
+        `;
+        // ---------------------------------------------
+
+        async function fetchData() {
+            const container = document.getElementById('results-container');
+            const endpointUrl = 'https://query.wikidata.org/sparql';
+            const fullUrl = endpointUrl + '?query=' + encodeURIComponent(myQuery) + '&format=json';
+
             try {
-                // Use CORS proxy for bypassing CORS
-                const url = `https://api.allorigins.win/get?url=https://www.wikidata.org/wiki/Special:EntityData/${itemId}.json`;
-                console.log(`Fetching data from: ${url}`);
-                const response = await fetch(url);
+                const response = await fetch(fullUrl);
+                const data = await response.json();
+                const items = data.results.bindings;
 
-                if (!response.ok) {
-                    throw new Error(`Network response was not ok: ${response.statusText}`);
-                }
+                // Clear the loading message
+                container.innerHTML = '';
 
-                const jsonResponse = await response.json();
-                const data = JSON.parse(jsonResponse.contents); // Parse the response body
-                console.log('Data fetched successfully:', data);
-                
-                return data;
+                // Loop through results and create cards
+                items.forEach(result => {
+                    const title = result.itemLabel ? result.itemLabel.value : 'No Title';
+                    const link = result.item ? result.item.value : '#';
+                    const imageUrl = result.image ? result.image.value : '';
+
+                    // Create the HTML for one card
+                    const cardHtml = `
+                        <article class="card">
+                            <header><strong>${title}</strong></header>
+                            ${imageUrl ? `<img src="${imageUrl}" alt="${title}" style="width:100%; margin-bottom: 10px;">` : ''}
+                            <footer style="margin-top: 10px;">
+                                <a href="${link}" target="_blank" role="button" class="contrast outline">View on Wikidata</a>
+                            </footer>
+                        </article>
+                    `;
+                    container.innerHTML += cardHtml;
+                });
+
             } catch (error) {
-                console.error('Error fetching Wikidata item:', error);
-                return null;
+                container.innerHTML = `<p style="color:red">Error fetching data: ${error.message}</p>`;
             }
         }
 
-        // Example: Fetch and display information about Q42 (Douglas Adams)
-        fetchWikidataItem('Q42').then(data => {
-            if (data) {
-                const entity = data.entities['Q42'];
-                const label = entity.labels.en.value;
-                const description = entity.descriptions.en.value;
-
-                document.getElementById('wikidata-info').innerHTML = `
-                    <h2>${label}</h2>
-                    <p>${description}</p>
-                `;
-            } else {
-                document.getElementById('wikidata-info').innerHTML = '<p>Error fetching data.</p>';
-            }
-        }).catch(error => {
-            document.getElementById('wikidata-info').innerHTML = '<p>Error fetching data.</p>';
-            console.error('Error in fetchWikidataItem:', error);
-        });
+        // Run the function when the page loads
+        fetchData();
     </script>
 </body>
 </html>
