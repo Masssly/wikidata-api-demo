@@ -1,6 +1,54 @@
-// ----------------------------------------------------------------
-// WARNING: Replace the ENTIRE SCRIPT block below with this one
-// ----------------------------------------------------------------
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Masssly Wikibase Final Test</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        body { padding: 20px; background-color: #f0f4f8; }
+        h1, p { text-align: center; }
+        
+        /* Card Styling */
+        #results-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+            border-left: 5px solid #009688;
+        }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
+        .item-title { font-size: 1.4rem; font-weight: bold; margin-bottom: 5px; color: #2c3e50; }
+        .details { font-size: 0.9rem; color: #555; }
+        .error-message { 
+            grid-column: 1 / -1; 
+            background: #ffebeb; 
+            padding: 20px; 
+            border: 1px solid #ff0000; 
+            border-radius: 8px; 
+            color: #ff0000;
+        }
+        .loading { grid-column: 1 / -1; text-align: center; font-size: 1.5rem; color: #666; }
+    </style>
+</head>
+<body>
+
+    <main class="container">
+        <h1>✨ Masssly Wikibase Wildcard Test</h1>
+        <p>This query attempts to find the 5 simplest **raw triples** (Subject, Predicate, Object) available in the database.</p>
+        
+        <div id="results-container">
+            <div class="loading">📡 Connecting via CORS Proxy...</div>
+        </div>
+    </main>
+
     <script>
         // === CONFIGURATION START ===
         
@@ -8,12 +56,11 @@
         const massslyEndpoint = 'https://query.masssly.wikibase.cloud/sparql';
         const endpointUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(massslyEndpoint)}`;
 
-        // 2. ULTRA-SIMPLE TEST QUERY: Find the first 5 Items and their IDs (No Labels)
-        // This is the simplest possible query to confirm the connection is fully working.
+        // 2. ABSOLUTE MINIMUM QUERY: Find any Subject, Predicate, Object (S P O) triple.
         const myQuery = `
-            SELECT ?item
+            SELECT ?s ?p ?o
             WHERE {
-              ?item a wikibase:Item .
+              ?s ?p ?o .
             }
             LIMIT 5
         `;
@@ -32,7 +79,8 @@
                 if (!data || !data.results || !data.results.bindings) {
                     container.innerHTML = `<div class="error-message">
                         <h4>❌ SPARQL Query Failed Server-Side</h4>
-                        <p>The query syntax likely contains an element (like prefixes or a service call) that the Masssly server rejects, causing it to return an invalid result structure.</p>
+                        <p>This means even the simplest query is rejected by the Masssly Query Service, likely due to a service-specific configuration issue beyond your control, or the query service is down.</p>
+                        <p>To confirm, please test this exact query on the <a href="https://query.masssly.wikibase.cloud/" target="_blank">Masssly Query Service</a> interface.</p>
                         <p>Data Snippet Received: <code>${JSON.stringify(data).substring(0, 300)}...</code></p>
                     </div>`;
                     return;
@@ -43,22 +91,22 @@
                 container.innerHTML = ''; 
 
                 if(items.length === 0) {
-                    container.innerHTML = '<p>✅ Connection OK, but query returned 0 results. The Wikibase may have no Items.</p>';
+                    container.innerHTML = '<p>✅ Connection OK, but query returned 0 results. The Wikibase may be empty.</p>';
                     return;
                 }
                 
-                // Display Results (Adapted to only show Item ID, as we removed the label service)
-                items.forEach(result => {
-                    // Item URL is guaranteed to exist by the query
-                    const link = result.item.value; 
-                    const entityId = link.split('/').pop();
+                // Display Results (Showing raw S-P-O triples)
+                items.forEach((result, index) => {
+                    const subject = result.s.value;
+                    const predicate = result.p.value.split('/').pop(); // Show just the ID for brevity
+                    const object = result.o.value;
 
                     const cardHtml = `
                         <article class="card">
-                            <div class="item-title">SUCCESS: Entity Found</div>
-                            <div class="details">Raw URL: <strong>${link}</strong></div>
-                            <div class="details">Entity ID: <strong>${entityId}</strong></div>
-                            <a href="${link}" target="_blank" role="button" class="secondary" style="margin-top: 15px;">View Item ${entityId}</a>
+                            <div class="item-title">Triple #${index + 1} Found</div>
+                            <div class="details">Subject: <a href="${subject}" target="_blank">${subject.split('/').pop()}</a></div>
+                            <div class="details">Predicate (Property): <strong>${predicate}</strong></div>
+                            <div class="details">Object: ${object.substring(0, 50)}...</div>
                         </article>
                     `;
                     container.innerHTML += cardHtml;
@@ -68,9 +116,12 @@
                 container.innerHTML = `<div class="error-message">
                     <h4>🚨 General Fetch Error (Proxy/Network)</h4>
                     <p>Error fetching data: <strong>${error.message}</strong></p>
+                    <p>The CORS proxy might be temporarily down, or there is a local network issue.</p>
                 </div>`;
             }
         }
 
         fetchData();
     </script>
+</body>
+</html>
