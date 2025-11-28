@@ -42,29 +42,32 @@
     </main>
 
     <script>
-        // === CONFIGURATION START ===
+// === CONFIGURATION START ===
         
-        // 1. **CRITICAL CHANGE:** The custom SPARQL endpoint URL
-        const endpointUrl = 'https://query.masssly.wikibase.cloud/sparql'; 
+// 1. **CRITICAL CHANGE:** The custom SPARQL endpoint URL is now wrapped in a proxy
+const massslyEndpoint = 'https://query.masssly.wikibase.cloud/sparql';
+    
+// Use the All Origins proxy service to wrap the request
+const endpointUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(massslyEndpoint)}`;
 
-        // 2. The custom SPARQL query (Uses your exact prefixes and logic)
-        const myQuery = `
-            PREFIX mwd: <https://masssly.wikibase.cloud/entity/>
-            PREFIX mwdt: <https://masssly.wikibase.cloud/prop/direct/>
+// 2. The custom SPARQL query (Uses your exact prefixes and logic)
+const myQuery = `
+    PREFIX mwd: <https://masssly.wikibase.cloud/entity/>
+    PREFIX mwdt: <https://masssly.wikibase.cloud/prop/direct/>
 
-            SELECT ?item ?itemLabel
-            WHERE {
-                # Find all items where "instance of (P3)" = Human (Q4).
-                ?item mwdt:P3 mwd:Q4 .
-                
-                # Bring in human-readable labels (names) in English.
-                SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-            }
-            ORDER BY ?itemLabel
-            LIMIT 20
-        `;
+    SELECT ?item ?itemLabel
+    WHERE {
+        # Find all items where "instance of (P3)" = Human (Q4).
+        ?item mwdt:P3 mwd:Q4 .
         
-        // === CONFIGURATION END ===
+        # Bring in human-readable labels (names) in English.
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+    }
+    ORDER BY ?itemLabel
+    LIMIT 20
+`;
+
+// === CONFIGURATION END ===
 
         async function fetchData() {
             const container = document.getElementById('results-container');
