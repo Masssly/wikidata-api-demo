@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Masssly Wikibase Cloud - Human Data</title>
+    <title>Masssly Wikibase Test</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
     <style>
         body { padding: 20px; background-color: #f0f4f8; }
@@ -27,47 +27,49 @@
         .card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
         .item-title { font-size: 1.4rem; font-weight: bold; margin-bottom: 5px; color: #2c3e50; }
         .details { font-size: 0.9rem; color: #555; }
+        .error-message { 
+            grid-column: 1 / -1; 
+            background: #ffebeb; 
+            padding: 20px; 
+            border: 1px solid #ff0000; 
+            border-radius: 8px; 
+            color: #ff0000;
+        }
         .loading { grid-column: 1 / -1; text-align: center; font-size: 1.5rem; color: #666; }
     </style>
 </head>
 <body>
 
     <main class="container">
-        <h1>👨‍👩‍👧‍👦 Masssly Wikibase Cloud - All Humans</h1>
-        <p>This pulls all items marked as **instance of: Human (Q4)** from your genealogy Wikibase.</p>
+        <h1>🧪 Masssly Wikibase Connection Test</h1>
+        <p>This query attempts to find the first 5 entities, regardless of type, to verify the connection.</p>
         
         <div id="results-container">
-            <div class="loading">📡 Connecting to Masssly Wikibase Cloud...</div>
+            <div class="loading">📡 Connecting via CORS Proxy...</div>
         </div>
     </main>
 
     <script>
-// === CONFIGURATION START ===
+        // === CONFIGURATION START ===
         
-// 1. **CRITICAL CHANGE:** The custom SPARQL endpoint URL is now wrapped in a proxy
-const massslyEndpoint = 'https://query.masssly.wikibase.cloud/sparql';
-    
-// Use the All Origins proxy service to wrap the request
-const endpointUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(massslyEndpoint)}`;
+        // 1. CRITICAL CHANGE: The custom SPARQL endpoint URL is wrapped in a proxy
+        const massslyEndpoint = 'https://query.masssly.wikibase.cloud/sparql';
+        const endpointUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(massslyEndpoint)}`;
 
-// 2. The custom SPARQL query (Uses your exact prefixes and logic)
-const myQuery = `
-    PREFIX mwd: <https://masssly.wikibase.cloud/entity/>
-    PREFIX mwdt: <https://masssly.wikibase.cloud/prop/direct/>
-
-    SELECT ?item ?itemLabel
-    WHERE {
-        # Find all items where "instance of (P3)" = Human (Q4).
-        ?item mwdt:P3 mwd:Q4 .
+        // 2. SOLUTION A TEST QUERY: Find the first 5 entities regardless of type.
+        const myQuery = `
+            SELECT ?item ?itemLabel
+            WHERE {
+              # Find ANY entity (Item or Lexeme)
+              ?item ?p ?o . 
+              
+              # Use the label service (as it worked in your example)
+              SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+            }
+            LIMIT 5
+        `;
         
-        # Bring in human-readable labels (names) in English.
-        SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-    }
-    ORDER BY ?itemLabel
-    LIMIT 20
-`;
-
-// === CONFIGURATION END ===
+        // === CONFIGURATION END ===
 
         async function fetchData() {
             const container = document.getElementById('results-container');
@@ -76,20 +78,35 @@ const myQuery = `
             try {
                 const response = await fetch(fullUrl);
                 const data = await response.json();
-                const items = data.results.bindings;
 
-                container.innerHTML = ''; // Clear loading
-
-                if(items.length === 0) {
-                    container.innerHTML = '<p>No results found. The Wikibase might be empty or the query needs adjustment.</p>';
+                // 🛑 NEW ROBUST CHECK FOR DATA STRUCTURE 🛑
+                if (!data || !data.results || !data.results.bindings) {
+                    // This block catches the 'data.results is undefined' error
+                    container.innerHTML = `<div class="error-message">
+                        <h4>❌ SPARQL Query or Server Error</h4>
+                        <p>The connection succeeded, but the Masssly server returned a malformed or empty results object (it's missing the expected 'bindings' list).</p>
+                        <p>This likely means the **query failed on the server side**.</p>
+                        <p>Data Snippet Received: <code>${JSON.stringify(data).substring(0, 300)}...</code></p>
+                        <p>Try using the <a href="https://query.masssly.wikibase.cloud/" target="_blank">Masssly Query Service</a> directly to check if your query runs without errors.</p>
+                    </div>`;
+                    console.error("Wikibase Query Structure Error:", data);
                     return;
                 }
+                
+                const items = data.results.bindings;
+                
+                // Clear loading
+                container.innerHTML = ''; 
 
+                if(items.length === 0) {
+                    container.innerHTML = '<p>✅ Connection OK, but query returned 0 results. The Wikibase may be empty.</p>';
+                    return;
+                }
+                
+                // Display Results
                 items.forEach(result => {
                     const label = result.itemLabel ? result.itemLabel.value : 'No Label Found';
                     const link = result.item ? result.item.value : '#';
-                    
-                    // Extract the Q/L ID from the URL (e.g., Q123)
                     const entityId = link.split('/').pop();
 
                     const cardHtml = `
@@ -103,8 +120,13 @@ const myQuery = `
                 });
 
             } catch (error) {
+                // This block catches the original NetworkError (CORS failure) or a general fetch issue.
+                container.innerHTML = `<div class="error-message">
+                    <h4>🚨 General Fetch Error</h4>
+                    <p>Error fetching data (Check proxy/network): <strong>${error.message}</strong></p>
+                    <p>If this is the CORS error, ensure the proxy URL is correct.</p>
+                </div>`;
                 console.error(error);
-                container.innerHTML = `<p style="color:red; grid-column: 1 / -1;">Error fetching data. Check your connection or query: ${error.message}</p>`;
             }
         }
 
